@@ -1,0 +1,5 @@
+venv/
+config.py
+.deno/
+__pycache__/
+.ssh/
