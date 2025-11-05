@@ -1,7 +1,7 @@
 # Telegram Downloader Bot (yt-dlp)
 *Проект от LifeInvader Inc.*
 
-https://github.com/user-attachments/assets/9c4ac611-d3ef-42c5-adf1-bb57c3337a45
+![Демо-анимация бота](https://github.com/user-attachments/assets/9c4ac611-d3ef-42c5-adf1-bb57c3337a45)
 
 Многофункциональный Telegram-бот на Python для скачивания видео и аудио с YouTube, VK, RuTube и тысяч других сайтов, поддерживаемых `yt-dlp`.
 
