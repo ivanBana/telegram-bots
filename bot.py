@@ -94,16 +94,17 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await message.edit_text(error_text)
         logging.error(f"Ошибка обработки ссылки {url}: {e}")
 
-
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обрабатывает нажатия на кнопки."""
     query = update.callback_query
     await query.answer()
-    
-    # 1. Создаём уникальную базу для имени файла
-    user_id = query.effective_user.id
+
+    # --- !! ИСПРАВЛЕНИЕ !! ---
+    # Используем query.from_user.id вместо query.effective_user.id
+    user_id = query.from_user.id
     timestamp = int(time.time())
     unique_filename_base = f"{user_id}_{timestamp}"
+    # --- !! КОНЕЦ ИСПРАВЛЕНИЯ !! ---
 
     callback_data = query.data
     url = context.user_data.get('url')
@@ -124,11 +125,10 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     try:
         if file_type == 'v': 
-            # Используем уникальное имя
             file_path = f'{unique_filename_base}.mp4' 
             ydl_opts = {
                 'format': format_id, 
-                'outtmpl': f'{unique_filename_base}.%(ext)s', # Используем уникальное имя
+                'outtmpl': f'{unique_filename_base}.%(ext)s', 
                 'force_ipv4': True,
                 'no_check_certificate': True,
             }
@@ -136,22 +136,20 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                  ydl_opts['merge_output_format'] = 'mp4'
 
         else: # Аудио
-            # Используем уникальное имя
             file_path = f'{unique_filename_base}.mp3'
             ydl_opts = {
                 'format': format_id,
-                'outtmpl': f'{unique_filename_base}.%(ext)s', # Используем уникальное имя
+                'outtmpl': f'{unique_filename_base}.%(ext)s', 
                 'force_ipv4': True,
                 'no_check_certificate': True,
                 'postprocessors': [{'key': 'FFmpegExtractAudio','preferredcodec': 'mp3','preferredquality': '192'}],
             }
-        
+
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.download([url])
-            
-            # Умное определение имени файла (на всякий случай)
+
             downloaded_file = ydl.prepare_filename(ydl.extract_info(url, download=False))
-            
+
             if file_type == 'v':
                 if merge_needed and not downloaded_file.endswith('.mp4'):
                      potential_mp4_path = downloaded_file.rsplit('.', 1)[0] + '.mp4'
@@ -163,14 +161,22 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                          file_path = downloaded_file
                 elif os.path.exists(f'{unique_filename_base}.mp4'):
                     file_path = f'{unique_filename_base}.mp4'
-                else:
+                # Проверяем, существует ли файл, прежде чем пытаться его переименовать
+                elif os.path.exists(downloaded_file):
                     file_path = downloaded_file.rsplit('.', 1)[0] + '.mp4'
-            
+                    os.rename(downloaded_file, file_path) # Явно переименуем
+                else:
+                    file_path = f'{unique_filename_base}.mp4' # Возвращаемся к нашему имени
+
             elif file_type == 'a': 
-                 file_path = downloaded_file.replace('.webm', '.mp3').replace('.m4a', '.mp3')
-                 # Если имя всё равно не то, берём наше
-                 if not os.path.exists(file_path):
+                 # Логика определения аудио файла
+                 potential_mp3_path = downloaded_file.rsplit('.', 1)[0] + '.mp3'
+                 if os.path.exists(potential_mp3_path):
+                     file_path = potential_mp3_path
+                 elif os.path.exists(f'{unique_filename_base}.mp3'):
                      file_path = f'{unique_filename_base}.mp3'
+                 else:
+                     file_path = downloaded_file.replace('.webm', '.mp3').replace('.m4a', '.mp3')
 
 
         await query.edit_message_text("Загрузка завершена! Отправляю файл...")
@@ -184,10 +190,10 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text("Готово! Можешь присылать следующую ссылку.")
 
     except Exception as e:
-        # Удаляем мусорные файлы, если они остались
+        # Пытаемся удалить мусорные файлы, если они остались
         if os.path.exists(f'{unique_filename_base}.mp4'): os.remove(f'{unique_filename_base}.mp4')
         if os.path.exists(f'{unique_filename_base}.mp3'): os.remove(f'{unique_filename_base}.mp3')
-        
+
         await query.edit_message_text(f"Произошла ошибка при скачивании: {e}")
         logging.error(f"Ошибка скачивания для {url} с форматом {format_id}: {e}")
 
